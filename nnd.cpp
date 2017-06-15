@@ -47,7 +47,7 @@ public:
   int getInt(){return num;}
 };
 
-class Word : Eval{
+class Word : public Eval{
 public:
   std::function<void(std::stack<Data*> &)> word;
   Word(std::function<void(std::stack<Data*> &)> w){word = w;}
@@ -58,9 +58,9 @@ public:
 };
 
 struct Program{
-  std::stack<Data> dataStack;
+  std::stack<Data*> dataStack;
   std::list<Eval*> programStack;
-  std::unordered_map<std::string,Eval*> env;
+  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env;
 };
 
 //fix to do hard copies?
@@ -77,7 +77,7 @@ std::list<std::string> tokenize(std::string str){
   return tokens;
 }
 
-void print_tokens(std::list<std::string> tokens){
+void printTokens(std::list<std::string> tokens){
   for(auto const& i : tokens){
     std::cout<<i<<std::endl;
   }
@@ -98,21 +98,60 @@ std::list<Eval*> identify(std::list<std::string> tokens,
 			  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env){
   std::list<Eval*> identified;
   for(auto const& i : tokens){
+    std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>>::const_iterator lookup = env.find(i);
     if(allDigit(i)){
       Eval* digit = new IntWord(std::stoi(i));
       identified.push_back(digit);
+    }
+    else if(lookup != env.end()){
+      Eval* function = new Word(lookup->second);
+      identified.push_back(function);
     }
   }
   return identified;
 }
 
-int main(){
-  //lest start by evaluating
-  //"5 dup *"
+Program initProgram(){
+  Program p;
+  //start with just the dup function
   std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> hmap;
   void (*d)(std::stack<Data*> &) = &dup;
   hmap["dup"] = d;
-  std::list<std::string> tokens = tokenize("5");
-  std::list<Eval*> identified = identify(tokens,hmap);
+
+  std::stack<Data*> dataStack;
+  p.dataStack = dataStack;
+
+  std::list<std::string> tokens = tokenize(program);
+  std::list<Eval*> programStack = identify(tokens,hmap);
+  p.programStack = programStack;
+
+  p.env = hmap;
+  
+  return p;
+}
+
+void run(Program &p){
+  for(auto const& i : p.programStack){
+    i->eval(p.dataStack);
+  }
+}
+
+int main(){
+  //lest start by evaluating
+  //"5 dup"
+  Program p = initProgram();
+  run(p);
+
+  while(!p.dataStack.empty()){
+    Data* dataPtr = p.dataStack.top();
+    std::cout<<dataPtr<<std::endl;
+    p.dataStack.pop();
+
+    Int* intPtr = dynamic_cast<Int*>(dataPtr);
+    if(intPtr){
+      std::cout<<intPtr->num<<std::endl;
+    }
+  }
+  
   return 0;
 }
