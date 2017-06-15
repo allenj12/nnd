@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <unordered_map>
 
-std::string program = "5 dup";
+std::string program = "5 dup *";
 
 //everything that lives on the stack
 class Data{
@@ -76,6 +76,19 @@ void dup(std::stack<Data*> &st){
   st.push(st.top());
 }
 
+void mul(std::stack<Data*> &st){
+  Data* xDPtr = st.top();
+  st.pop();
+  Data* yDPtr = st.top();
+  st.pop();
+
+  Int* xPtr = dynamic_cast<Int*>(xDPtr);
+  Int* yPtr = dynamic_cast<Int*>(yDPtr);
+    if(xDPtr && yPtr){
+      st.push(new Int(xPtr->num * yPtr->num));
+    }  
+}
+
 //simply splits the string by its spaces
 std::list<std::string> tokenize(std::string str){
   std::list<std::string> tokens;
@@ -131,7 +144,9 @@ Program initProgram(){
   //start with just the dup function
   std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> hmap;
   void (*d)(std::stack<Data*> &) = &dup;
+  void (*a)(std::stack<Data*> &) = &mul;
   hmap["dup"] = d;
+  hmap["*"] = a;
 
   std::stack<Data*> dataStack;
   p.dataStack = dataStack;
