@@ -9,43 +9,62 @@
 #include <ctype.h>
 #include <unordered_map>
 
-std::string program = "5 dup *";
+std::string program = "5 dup";
+
+class Data{
+public:
+  Data(){}
+  virtual ~Data(){}
+};
+
+class Int : public Data{
+public:
+  int num;
+  Int(int n){num = n;}
+  Int(Int* i){num = i->num;}
+  ~Int(){}
+};
 
 class Eval{
 public:
   Eval(){};
   virtual ~Eval(){};
-  virtual void eval(std::stack<Eval*> &) = 0;
+  virtual void eval(std::stack<Data*> &) = 0;
 };
 
-
-class Int : public Eval{
+//should probably get replaced
+//can be collapsed int Word
+class IntWord : public Eval{
 public:
   int num;
-  Int(int n){num = n;}
-  ~Int(){}
-  void eval(std::stack<Eval*> &st){
-    st.push(this);
+  IntWord(int n){num = n;}
+  ~IntWord(){}
+  void eval(std::stack<Data*> &st){
+    Data *i = new Int(num);
+    st.push(i);
   }
+  
+  int getInt(){return num;}
 };
 
 class Word : Eval{
 public:
-  std::function<void(std::stack<Eval*>)> word;
-  Word(std::function<void(std::stack<Eval*>)> w){word = w;}
+  std::function<void(std::stack<Data*> &)> word;
+  Word(std::function<void(std::stack<Data*> &)> w){word = w;}
   ~Word(){}
-  void eval(std::stack<Eval*> &st){
+  void eval(std::stack<Data*> &st){
     word(st);
   }
 };
 
 struct Program{
-  std::stack<Eval*> dataStack;
+  std::stack<Data> dataStack;
   std::list<Eval*> programStack;
   std::unordered_map<std::string,Eval*> env;
 };
 
-void dup(std::stack<Eval*> &st){
+//fix to do hard copies?
+void dup(std::stack<Data*> &st){
   st.push(st.top());
 }
 
@@ -76,11 +95,11 @@ bool allDigit(std::string str){
 }
 
 std::list<Eval*> identify(std::list<std::string> tokens,
-			  std::unordered_map<std::string,std::function<void(std::stack<Eval*> &)>> env){
+			  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env){
   std::list<Eval*> identified;
   for(auto const& i : tokens){
     if(allDigit(i)){
-      Eval* digit = new Int(std::stoi(i));
+      Eval* digit = new IntWord(std::stoi(i));
       identified.push_back(digit);
     }
   }
@@ -90,8 +109,8 @@ std::list<Eval*> identify(std::list<std::string> tokens,
 int main(){
   //lest start by evaluating
   //"5 dup *"
-  std::unordered_map<std::string,std::function<void(std::stack<Eval*> &)>> hmap;
-  void (*d)(std::stack<Eval*> &) = &dup;
+  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> hmap;
+  void (*d)(std::stack<Data*> &) = &dup;
   hmap["dup"] = d;
   std::list<std::string> tokens = tokenize("5");
   std::list<Eval*> identified = identify(tokens,hmap);
