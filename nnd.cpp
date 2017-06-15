@@ -11,12 +11,14 @@
 
 std::string program = "5 dup";
 
+//everything that lives on the stack
 class Data{
 public:
   Data(){}
   virtual ~Data(){}
 };
 
+//basic int with deep copy constructor
 class Int : public Data{
 public:
   int num;
@@ -25,6 +27,9 @@ public:
   ~Int(){}
 };
 
+//everything that lives in the program state
+//i.e 'dup' or '5'(a function that pushes 5 to the
+//stack)
 class Eval{
 public:
   Eval(){};
@@ -33,7 +38,7 @@ public:
 };
 
 //should probably get replaced
-//can be collapsed int Word
+//can be collapsed into Word
 class IntWord : public Eval{
 public:
   int num;
@@ -47,6 +52,8 @@ public:
   int getInt(){return num;}
 };
 
+//most functions not including literals that
+//push themselves onto the stack(such as ints)
 class Word : public Eval{
 public:
   std::function<void(std::stack<Data*> &)> word;
@@ -57,6 +64,7 @@ public:
   }
 };
 
+//total state of the running program
 struct Program{
   std::stack<Data*> dataStack;
   std::list<Eval*> programStack;
@@ -68,6 +76,7 @@ void dup(std::stack<Data*> &st){
   st.push(st.top());
 }
 
+//simply splits the string by its spaces
 std::list<std::string> tokenize(std::string str){
   std::list<std::string> tokens;
   std::istringstream iss(str);
@@ -77,12 +86,14 @@ std::list<std::string> tokenize(std::string str){
   return tokens;
 }
 
+//little debugging function
 void printTokens(std::list<std::string> tokens){
   for(auto const& i : tokens){
     std::cout<<i<<std::endl;
   }
 }
 
+//if every char is a digit
 bool allDigit(std::string str){
   bool all = true;
   for(auto const& i : str){
@@ -94,15 +105,19 @@ bool allDigit(std::string str){
   return all;
 }
 
+//changes a list of tokens to a list of there literal
+//representations ["5" "dup"] -> [Eval that pushes 5, Eval that dup's]
 std::list<Eval*> identify(std::list<std::string> tokens,
 			  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env){
   std::list<Eval*> identified;
   for(auto const& i : tokens){
     std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>>::const_iterator lookup = env.find(i);
+    //literal int check
     if(allDigit(i)){
       Eval* digit = new IntWord(std::stoi(i));
       identified.push_back(digit);
     }
+    //predifined function check
     else if(lookup != env.end()){
       Eval* function = new Word(lookup->second);
       identified.push_back(function);
@@ -142,6 +157,7 @@ int main(){
   Program p = initProgram();
   run(p);
 
+  //cheking example.
   while(!p.dataStack.empty()){
     Data* dataPtr = p.dataStack.top();
     std::cout<<dataPtr<<std::endl;
