@@ -1,5 +1,5 @@
 #include <iostream>
-#include <stack>
+//#include <stack>
 #include <string>
 #include <functional>
 #include <list>
@@ -9,13 +9,12 @@
 #include <ctype.h>
 #include <unordered_map>
 
-std::string program = "5 dup *";
-
 //everything that lives on the stack
 class Data{
 public:
   Data(){}
   virtual ~Data(){}
+  virtual std::string toString() = 0;
 };
 
 //basic int with deep copy constructor
@@ -25,6 +24,7 @@ public:
   Int(int n){num = n;}
   Int(Int* i){num = i->num;}
   ~Int(){}
+  std::string toString(){return std::to_string(num);};
 };
 
 //everything that lives in the program state
@@ -34,7 +34,7 @@ class Eval{
 public:
   Eval(){};
   virtual ~Eval(){};
-  virtual void eval(std::stack<Data*> &) = 0;
+  virtual void eval(std::list<Data*> &) = 0;
 };
 
 //should probably get replaced
@@ -44,9 +44,9 @@ public:
   int num;
   IntWord(int n){num = n;}
   ~IntWord(){}
-  void eval(std::stack<Data*> &st){
+  void eval(std::list<Data*> &st){
     Data *i = new Int(num);
-    st.push(i);
+    st.push_front(i);
   }
   
   int getInt(){return num;}
@@ -56,37 +56,41 @@ public:
 //push themselves onto the stack(such as ints)
 class Word : public Eval{
 public:
-  std::function<void(std::stack<Data*> &)> word;
-  Word(std::function<void(std::stack<Data*> &)> w){word = w;}
+  std::function<void(std::list<Data*> &)> word;
+  Word(std::function<void(std::list<Data*> &)> w){word = w;}
   ~Word(){}
-  void eval(std::stack<Data*> &st){
+  void eval(std::list<Data*> &st){
     word(st);
   }
 };
 
 //total state of the running program
 struct Program{
-  std::stack<Data*> dataStack;
+  std::list<Data*> dataStack;
   std::list<Eval*> programStack;
-  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env;
+  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> env;
 };
 
 //fix to do hard copies?
-void dup(std::stack<Data*> &st){
-  st.push(st.top());
+void dup(std::list<Data*> &st){
+  if(!st.empty()){
+    st.push_front(st.front());
+  }
 }
 
-void mul(std::stack<Data*> &st){
-  Data* xDPtr = st.top();
-  st.pop();
-  Data* yDPtr = st.top();
-  st.pop();
+void mul(std::list<Data*> &st){
+  if(st.size() >= 2){
+    Data* xDPtr = st.front();
+    st.pop_front();
+    Data* yDPtr = st.front();
+    st.pop_front();
 
-  Int* xPtr = dynamic_cast<Int*>(xDPtr);
-  Int* yPtr = dynamic_cast<Int*>(yDPtr);
+    Int* xPtr = dynamic_cast<Int*>(xDPtr);
+    Int* yPtr = dynamic_cast<Int*>(yDPtr);
     if(xDPtr && yPtr){
-      st.push(new Int(xPtr->num * yPtr->num));
-    }  
+      st.push_front(new Int(xPtr->num * yPtr->num));
+    }
+  }
 }
 
 //simply splits the string by its spaces
@@ -121,10 +125,10 @@ bool allDigit(std::string str){
 //changes a list of tokens to a list of there literal
 //representations ["5" "dup"] -> [Eval that pushes 5, Eval that dup's]
 std::list<Eval*> identify(std::list<std::string> tokens,
-			  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> env){
+			  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> env){
   std::list<Eval*> identified;
   for(auto const& i : tokens){
-    std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>>::const_iterator lookup = env.find(i);
+    std::unordered_map<std::string,std::function<void(std::list<Data*> &)>>::const_iterator lookup = env.find(i);
     //literal int check
     if(allDigit(i)){
       Eval* digit = new IntWord(std::stoi(i));
@@ -142,17 +146,20 @@ std::list<Eval*> identify(std::list<std::string> tokens,
 Program initProgram(){
   Program p;
   //start with just the dup function
-  std::unordered_map<std::string,std::function<void(std::stack<Data*> &)>> hmap;
-  void (*d)(std::stack<Data*> &) = &dup;
-  void (*a)(std::stack<Data*> &) = &mul;
+  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> hmap;
+  void (*d)(std::list<Data*> &) = &dup;
+  void (*a)(std::list<Data*> &) = &mul;
   hmap["dup"] = d;
   hmap["*"] = a;
 
-  std::stack<Data*> dataStack;
+  std::list<Data*> dataStack;
   p.dataStack = dataStack;
 
+  /*
   std::list<std::string> tokens = tokenize(program);
   std::list<Eval*> programStack = identify(tokens,hmap);
+  */
+  std::list<Eval*> programStack;
   p.programStack = programStack;
 
   p.env = hmap;
@@ -161,28 +168,38 @@ Program initProgram(){
 }
 
 void run(Program &p){
-  for(auto const& i : p.programStack){
-    i->eval(p.dataStack);
+  while(!p.programStack.empty()){
+    p.programStack.front()->eval(p.dataStack);
+    p.programStack.pop_front();
   }
+}
+
+void updateProgramStack(Program &p, std::string str){
+  std::list<std::string> tokens = tokenize(str);
+  std::list<Eval*> programStack = identify(tokens,p.env);
+  p.programStack = programStack;
 }
 
 int main(){
   //lest start by evaluating
   //"5 dup"
+  std::cout<<"\n";
+  std::cout<<"NNG repl: 'quit' to quit"<<std::endl;
+
+  std::string commands;
   Program p = initProgram();
-  run(p);
+  while(commands != "quit"){
+    std::cout<<">> ";
+    std::cin>>commands;
 
-  //cheking example.
-  while(!p.dataStack.empty()){
-    Data* dataPtr = p.dataStack.top();
-    std::cout<<dataPtr<<std::endl;
-    p.dataStack.pop();
+    updateProgramStack(p, commands);
+    run(p);
 
-    Int* intPtr = dynamic_cast<Int*>(dataPtr);
-    if(intPtr){
-      std::cout<<intPtr->num<<std::endl;
+    for(auto const& i : p.dataStack){
+      std::cout<<i->toString()<<std::endl;
     }
+
+    std::cout<<"\n";
   }
-  
   return 0;
 }
