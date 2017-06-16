@@ -190,6 +190,8 @@ int main(){
   Program p = initProgram();
   while(commands != "quit"){
     std::cout<<">> ";
+    //a plain cin is cool here to get a
+    //quick "step-by-step"
     getline(std::cin,commands);
 
     updateProgramStack(p, commands);
