@@ -45,8 +45,7 @@ public:
   IntWord(int n){num = n;}
   ~IntWord(){}
   void eval(std::list<Data*> &st){
-    Data *i = new Int(num);
-    st.push_front(i);
+    st.push_front(new Int(num));
   }
   
   int getInt(){return num;}
@@ -131,13 +130,11 @@ std::list<Eval*> identify(std::list<std::string> tokens,
     std::unordered_map<std::string,std::function<void(std::list<Data*> &)>>::const_iterator lookup = env.find(i);
     //literal int check
     if(allDigit(i)){
-      Eval* digit = new IntWord(std::stoi(i));
-      identified.push_back(digit);
+      identified.push_back(new IntWord(std::stoi(i)));
     }
     //predifined function check
     else if(lookup != env.end()){
-      Eval* function = new Word(lookup->second);
-      identified.push_back(function);
+      identified.push_back(new Word(lookup->second));
     }
   }
   return identified;
@@ -147,18 +144,12 @@ Program initProgram(){
   Program p;
   //start with just the dup function
   std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> hmap;
-  void (*d)(std::list<Data*> &) = &dup;
-  void (*a)(std::list<Data*> &) = &mul;
-  hmap["dup"] = d;
-  hmap["*"] = a;
+  hmap["dup"] = &dup;
+  hmap["*"] = &mul;
 
   std::list<Data*> dataStack;
   p.dataStack = dataStack;
 
-  /*
-  std::list<std::string> tokens = tokenize(program);
-  std::list<Eval*> programStack = identify(tokens,hmap);
-  */
   std::list<Eval*> programStack;
   p.programStack = programStack;
 
@@ -175,9 +166,7 @@ void run(Program &p){
 }
 
 void updateProgramStack(Program &p, std::string str){
-  std::list<std::string> tokens = tokenize(str);
-  std::list<Eval*> programStack = identify(tokens,p.env);
-  p.programStack = programStack;
+  p.programStack = identify(tokenize(str), p.env);
 }
 
 int main(){
