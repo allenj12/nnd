@@ -190,7 +190,7 @@ int main(){
   Program p = initProgram();
   while(commands != "quit"){
     std::cout<<">> ";
-    std::cin>>commands;
+    getline(std::cin,commands);
 
     updateProgramStack(p, commands);
     run(p);
@@ -198,7 +198,7 @@ int main(){
     for(auto const& i : p.dataStack){
       std::cout<<i->toString()<<std::endl;
     }
-
+    
     std::cout<<"\n";
   }
   return 0;
