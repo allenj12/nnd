@@ -107,7 +107,7 @@ bool allDigit(std::string str){
 
 //changes a list of tokens to a list of there literal
 //representations ["5" "dup"] -> [NNDObject that pushes 5, NNDObject that dup's]
-std::list<NNDObject*> identify(std::list<std::string> tokens,
+std::list<NNDObject*> parse(std::list<std::string> tokens,
 			  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env){
   std::list<NNDObject*> identified;
   for(auto const& i : tokens){
@@ -158,7 +158,7 @@ void run(Program &p){
 }
 
 void updateProgramStack(Program &p, std::string str){
-  p.programStack = identify(tokenize(str), p.env);
+  p.programStack = parse(tokenize(str), p.env);
 }
 
 int main(){
