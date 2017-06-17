@@ -48,10 +48,16 @@ struct Program{
   std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env;
 };
 
-//fix to do hard copies?
+//fix to do deep copies?
 void dup(std::list<NNDObject*> &st){
   if(!st.empty()){
     st.push_front(st.front());
+  }
+}
+
+void clear(std::list<NNDObject*> &st){
+  while(!st.empty()){
+    st.pop_front();
   }
 }
 
@@ -128,6 +134,7 @@ Program initProgram(){
   std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> hmap;
   hmap["dup"] = &dup;
   hmap["*"] = &mul;
+  hmap["clear"] = &clear;
 
   std::list<NNDObject*> dataStack;
   p.dataStack = dataStack;
