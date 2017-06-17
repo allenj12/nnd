@@ -27,17 +27,48 @@ public:
   ~Int(){}
   std::string toString(){return std::to_string(num);};
 };
-
+/*
+class NNDList : public NNDObject{
+public:
+  std::list<NNDObject> nndList;
+  NNDList(std::list<NNDObject*> l){nndList = l;}
+  NNDList(NNDList* i){nndList = i->nndList;}//fix this
+  ~NNDList(){}
+  std::string toString(){return "a list";};//fix this
+};
+*/
 //most functions not including literals that
 //push themselves onto the stack(such as ints)
 class Word : public NNDObject{
 public:
+  Word(){}
+  virtual ~Word(){}
+};
+
+class DsWord : public Word{
+public:
+  std::string name;
   std::function<void(std::list<NNDObject*> &)> word;
-  Word(std::function<void(std::list<NNDObject*> &)> w){word = w;}
-  ~Word(){}
-  std::string toString(){return "some fn";}
+  DsWord(std::string n, std::function<void(std::list<NNDObject*> &)> w){word = w; name = n;}
+  ~DsWord(){}
+  std::string toString() override {return name;}
   void eval(std::list<NNDObject*> &st){
     word(st);
+  }
+};
+
+class PsWord : public Word{
+public:
+  std::string name;
+  std::function<void( std::string, std::list<NNDObject*> &)> parseWord;
+  PsWord(std::string n,std::function<void(std::string, std::list<NNDObject*> &)> w){
+    parseWord = w;
+    name = n;
+  }
+  ~PsWord(){}
+  std::string toString() override {return name;}
+  void parse(std::string input, std::list<NNDObject*> &programStack){
+    parseWord(input,programStack);
   }
 };
 
@@ -45,10 +76,10 @@ public:
 struct Program{
   std::list<NNDObject*> dataStack;
   std::list<NNDObject*> programStack;
-  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env;
+  std::unordered_map<std::string, Word*> env;
 };
 
-//fix to do deep copies?
+//fix this to do deep copies?
 void dup(std::list<NNDObject*> &st){
   if(!st.empty()){
     st.push_front(st.front());
@@ -107,34 +138,50 @@ bool allDigit(std::string str){
 
 //changes a list of tokens to a list of there literal
 //representations ["5" "dup"] -> [NNDObject that pushes 5, NNDObject that dup's]
-std::list<NNDObject*> parse(std::list<std::string> tokens,
-			  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env){
-  std::list<NNDObject*> identified;
+std::list<NNDObject*> parse(std::list<std::string> tokens, //fix this, maybe do this one at a time
+			    std::unordered_map<std::string, Word*> env){
+  std::list<NNDObject*> parsed;
   for(auto const& i : tokens){
-    std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>>::const_iterator lookup = env.find(i);
     //literal int check
     if(allDigit(i)){
-      identified.push_back(new Word(
-				    [&i](std::list<NNDObject*> &st){
-				      st.push_front(new Int(std::stoi(i)));
-				    }));
-      //identified.push_back(new IntWord(std::stoi(i)));
+      int iToInt = std::stoi(i);
+      parsed.push_back(new DsWord(i,
+				  [=](std::list<NNDObject*> &st){
+				    st.push_front(new Int(iToInt));
+				  }));
     }
     //predifined function check
-    else if(lookup != env.end()){
-      identified.push_back(new Word(lookup->second));
+    else{
+      std::unordered_map<std::string,Word*>::iterator lookup = env.find(i);
+      if(lookup != env.end()){
+
+	DsWord* dsPtr = dynamic_cast<DsWord*>(&*lookup->second);
+	if(dsPtr){
+	  parsed.push_back(dsPtr);
+	}
+	else{
+	  PsWord* psPtr = dynamic_cast<PsWord*>(&*lookup->second);
+	  if(psPtr){
+	    //parse things
+	  }
+	}
+      }
     }
-  }
-  return identified;
+  } 
+  return parsed;
+}
+
+DsWord* fnToDsWord(std::string name, std::function<void(std::list<NNDObject*> &)> fn){
+  return new DsWord(name, fn);
 }
 
 Program initProgram(){
   Program p;
   //start with just the dup function
-  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> hmap;
-  hmap["dup"] = &dup;
-  hmap["*"] = &mul;
-  hmap["clear"] = &clear;
+  std::unordered_map<std::string, Word*> hmap;
+  hmap["dup"] = fnToDsWord("dup",&dup);
+  hmap["*"] = fnToDsWord("*", &mul);
+  hmap["clear"] = fnToDsWord("clear", &clear);
 
   std::list<NNDObject*> dataStack;
   p.dataStack = dataStack;
@@ -149,7 +196,7 @@ Program initProgram(){
 
 void run(Program &p){
   while(!p.programStack.empty()){
-    Word* wordPtr = dynamic_cast<Word*>(p.programStack.front());
+    DsWord* wordPtr = dynamic_cast<DsWord*>(p.programStack.front());
     if(wordPtr){
       wordPtr->eval(p.dataStack);
     }
