@@ -37,20 +37,6 @@ public:
   virtual void eval(std::list<Data*> &) = 0;
 };
 
-//should probably get replaced
-//can be collapsed into Word
-class IntWord : public Eval{
-public:
-  int num;
-  IntWord(int n){num = n;}
-  ~IntWord(){}
-  void eval(std::list<Data*> &st){
-    st.push_front(new Int(num));
-  }
-  
-  int getInt(){return num;}
-};
-
 //most functions not including literals that
 //push themselves onto the stack(such as ints)
 class Word : public Eval{
@@ -130,7 +116,11 @@ std::list<Eval*> identify(std::list<std::string> tokens,
     std::unordered_map<std::string,std::function<void(std::list<Data*> &)>>::const_iterator lookup = env.find(i);
     //literal int check
     if(allDigit(i)){
-      identified.push_back(new IntWord(std::stoi(i)));
+      identified.push_back(new Word(
+				    [&i](std::list<Data*> &st){
+				      st.push_front(new Int(std::stoi(i)));
+				    }));
+      //identified.push_back(new IntWord(std::stoi(i)));
     }
     //predifined function check
     else if(lookup != env.end()){
