@@ -70,7 +70,7 @@ void mul(std::list<NNDObject*> &st){
 
     Int* xPtr = dynamic_cast<Int*>(xDPtr);
     Int* yPtr = dynamic_cast<Int*>(yDPtr);
-    if(xDPtr && yPtr){
+    if(xPtr && yPtr){
       st.push_front(new Int(xPtr->num * yPtr->num));
     }
   }
