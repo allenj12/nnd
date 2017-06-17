@@ -9,16 +9,17 @@
 #include <ctype.h>
 #include <unordered_map>
 
-//everything that lives on the stack
-class Data{
+//everything that lives on the data stack
+//or the program stack
+class NNDObject{
 public:
-  Data(){}
-  virtual ~Data(){}
+  NNDObject(){}
+  virtual ~NNDObject(){}
   virtual std::string toString() = 0;
 };
 
 //basic int with deep copy constructor
-class Int : public Data{
+class Int : public NNDObject{
 public:
   int num;
   Int(int n){num = n;}
@@ -27,47 +28,38 @@ public:
   std::string toString(){return std::to_string(num);};
 };
 
-//everything that lives in the program state
-//i.e 'dup' or '5'(a function that pushes 5 to the
-//stack)
-class Eval{
-public:
-  Eval(){};
-  virtual ~Eval(){};
-  virtual void eval(std::list<Data*> &) = 0;
-};
-
 //most functions not including literals that
 //push themselves onto the stack(such as ints)
-class Word : public Eval{
+class Word : public NNDObject{
 public:
-  std::function<void(std::list<Data*> &)> word;
-  Word(std::function<void(std::list<Data*> &)> w){word = w;}
+  std::function<void(std::list<NNDObject*> &)> word;
+  Word(std::function<void(std::list<NNDObject*> &)> w){word = w;}
   ~Word(){}
-  void eval(std::list<Data*> &st){
+  std::string toString(){return "some fn";}
+  void eval(std::list<NNDObject*> &st){
     word(st);
   }
 };
 
 //total state of the running program
 struct Program{
-  std::list<Data*> dataStack;
-  std::list<Eval*> programStack;
-  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> env;
+  std::list<NNDObject*> dataStack;
+  std::list<NNDObject*> programStack;
+  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env;
 };
 
 //fix to do hard copies?
-void dup(std::list<Data*> &st){
+void dup(std::list<NNDObject*> &st){
   if(!st.empty()){
     st.push_front(st.front());
   }
 }
 
-void mul(std::list<Data*> &st){
+void mul(std::list<NNDObject*> &st){
   if(st.size() >= 2){
-    Data* xDPtr = st.front();
+    NNDObject* xDPtr = st.front();
     st.pop_front();
-    Data* yDPtr = st.front();
+    NNDObject* yDPtr = st.front();
     st.pop_front();
 
     Int* xPtr = dynamic_cast<Int*>(xDPtr);
@@ -108,16 +100,16 @@ bool allDigit(std::string str){
 }
 
 //changes a list of tokens to a list of there literal
-//representations ["5" "dup"] -> [Eval that pushes 5, Eval that dup's]
-std::list<Eval*> identify(std::list<std::string> tokens,
-			  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> env){
-  std::list<Eval*> identified;
+//representations ["5" "dup"] -> [NNDObject that pushes 5, NNDObject that dup's]
+std::list<NNDObject*> identify(std::list<std::string> tokens,
+			  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> env){
+  std::list<NNDObject*> identified;
   for(auto const& i : tokens){
-    std::unordered_map<std::string,std::function<void(std::list<Data*> &)>>::const_iterator lookup = env.find(i);
+    std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>>::const_iterator lookup = env.find(i);
     //literal int check
     if(allDigit(i)){
       identified.push_back(new Word(
-				    [&i](std::list<Data*> &st){
+				    [&i](std::list<NNDObject*> &st){
 				      st.push_front(new Int(std::stoi(i)));
 				    }));
       //identified.push_back(new IntWord(std::stoi(i)));
@@ -133,14 +125,14 @@ std::list<Eval*> identify(std::list<std::string> tokens,
 Program initProgram(){
   Program p;
   //start with just the dup function
-  std::unordered_map<std::string,std::function<void(std::list<Data*> &)>> hmap;
+  std::unordered_map<std::string,std::function<void(std::list<NNDObject*> &)>> hmap;
   hmap["dup"] = &dup;
   hmap["*"] = &mul;
 
-  std::list<Data*> dataStack;
+  std::list<NNDObject*> dataStack;
   p.dataStack = dataStack;
 
-  std::list<Eval*> programStack;
+  std::list<NNDObject*> programStack;
   p.programStack = programStack;
 
   p.env = hmap;
@@ -150,7 +142,10 @@ Program initProgram(){
 
 void run(Program &p){
   while(!p.programStack.empty()){
-    p.programStack.front()->eval(p.dataStack);
+    Word* wordPtr = dynamic_cast<Word*>(p.programStack.front());
+    if(wordPtr){
+      wordPtr->eval(p.dataStack);
+    }
     p.programStack.pop_front();
   }
 }
