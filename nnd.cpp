@@ -54,7 +54,7 @@ public:
   DsWord(std::string n,
 	 std::function<void(std::list<NNDObject*> &)> w){word = w; name = n;}
   ~DsWord(){}
-  std::string toString() override {return name;}
+  std::string toString() override {return "DsWord: " + name;}
   void eval(std::list<NNDObject*> &st){
     word(st);
   }
@@ -77,9 +77,9 @@ public:
     end = e;
   }
   ~PsWord(){}
-  std::string toString() override {return name;}
+  std::string toString() override {return "PsWord: " + name;}
   void parse(std::string input,
-	     std::unordered_map<std::string, Word*> env,
+	     std::unordered_map<std::string, Word*> &env,
 	     std::list<NNDObject*> &programStack){
     parseWord(input,env,programStack);
   }
@@ -152,7 +152,7 @@ bool allDigit(std::string str){
 //changes a list of tokens to a list of there literal
 //representations ["5" "dup"] -> [NNDObject that pushes 5, NNDObject that dup's]
 std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at a time
-			    std::unordered_map<std::string, Word*> env){
+			    std::unordered_map<std::string, Word*> &env){
   std::list<NNDObject*> parsed;
   std::istringstream iss(input);
   std::string i;
@@ -176,18 +176,30 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
 	}
 	else{
 	  PsWord* psPtr = dynamic_cast<PsWord*>(&*lookup->second);
-	  if(psPtr){
-	    
+	  if(psPtr){  
+	    //hack for now
+	    //fix this
+	    bool foundEnd = false;
+	    std::string input;
+	    std::string temp;
+	    while(!foundEnd){
+	      iss>>temp;
+	      if(temp == psPtr->end){
+		foundEnd = true;
+	      }
+	      else{
+		//an even bigger hack
+		//fix this
+	      input += " " + temp;
+	      }
+	    }
+	    psPtr->parse(input, env, parsed);
 	  }
 	}
       }
     }
   } 
   return parsed;
-}
-
-std::string firstWord(std::string input){
-  
 }
 
 //parsing word that creates parsing words
@@ -207,17 +219,18 @@ void defineWord(std::string input,
 		std::unordered_map<std::string,Word*> &env,
 		std::list<NNDObject*> &ps){
   input = input.substr(input.find_first_not_of(" \t"),input.find_last_not_of(" \t"));
-  std::string name = input.substr(0,input.find_first_of(" \t") - 1); //check
+  std::string name = input.substr(0,input.find_first_of(" \t")); //check
   std::string rest = input.substr(input.find_first_of(" \t"));
   std::list<NNDObject*> parsed = parse(rest,env);
-  env[name] = fnToDsWord(name, [=](std::list<NNDObject*> &st){
-      for(auto const& i : parsed){
-	DsWord* wordPtr = dynamic_cast<DsWord*>(i);
-	if(wordPtr){
-	  wordPtr->eval(st);
-	}
-      }
-    });
+  env[name] = fnToDsWord(name,
+			 [=](std::list<NNDObject*> &st){
+			   for(auto const& i : parsed){
+			     DsWord* wordPtr = dynamic_cast<DsWord*>(i);
+			     if(wordPtr){
+			       wordPtr->eval(st);
+			     }
+			   }
+			 });
 }
 
 Program initProgram(){
