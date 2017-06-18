@@ -27,6 +27,7 @@ public:
   ~Int(){}
   std::string toString(){return std::to_string(num);};
 };
+
 /*
 class NNDList : public NNDObject{
 public:
@@ -37,6 +38,7 @@ public:
   std::string toString(){return "a list";};//fix this
 };
 */
+
 //most functions not including literals that
 //push themselves onto the stack(such as ints)
 class Word : public NNDObject{
@@ -49,7 +51,8 @@ class DsWord : public Word{
 public:
   std::string name;
   std::function<void(std::list<NNDObject*> &)> word;
-  DsWord(std::string n, std::function<void(std::list<NNDObject*> &)> w){word = w; name = n;}
+  DsWord(std::string n,
+	 std::function<void(std::list<NNDObject*> &)> w){word = w; name = n;}
   ~DsWord(){}
   std::string toString() override {return name;}
   void eval(std::list<NNDObject*> &st){
@@ -60,15 +63,25 @@ public:
 class PsWord : public Word{
 public:
   std::string name;
-  std::function<void( std::string, std::list<NNDObject*> &)> parseWord;
-  PsWord(std::string n,std::function<void(std::string, std::list<NNDObject*> &)> w){
+  std::string end;
+  std::function<void(std::string,
+		     std::unordered_map<std::string, Word*>&,
+		     std::list<NNDObject*> &)> parseWord;
+  PsWord(std::string n,
+	 std::string e,
+	 std::function<void(std::string,
+			    std::unordered_map<std::string, Word*>&,
+			    std::list<NNDObject*> &)> w){
     parseWord = w;
     name = n;
+    end = e;
   }
   ~PsWord(){}
   std::string toString() override {return name;}
-  void parse(std::string input, std::list<NNDObject*> &programStack){
-    parseWord(input,programStack);
+  void parse(std::string input,
+	     std::unordered_map<std::string, Word*> env,
+	     std::list<NNDObject*> &programStack){
+    parseWord(input,env,programStack);
   }
 };
 
@@ -138,10 +151,12 @@ bool allDigit(std::string str){
 
 //changes a list of tokens to a list of there literal
 //representations ["5" "dup"] -> [NNDObject that pushes 5, NNDObject that dup's]
-std::list<NNDObject*> parse(std::list<std::string> tokens, //fix this, maybe do this one at a time
+std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at a time
 			    std::unordered_map<std::string, Word*> env){
   std::list<NNDObject*> parsed;
-  for(auto const& i : tokens){
+  std::istringstream iss(input);
+  std::string i;
+  while(iss >> i){
     //literal int check
     if(allDigit(i)){
       int iToInt = std::stoi(i);
@@ -162,7 +177,7 @@ std::list<NNDObject*> parse(std::list<std::string> tokens, //fix this, maybe do 
 	else{
 	  PsWord* psPtr = dynamic_cast<PsWord*>(&*lookup->second);
 	  if(psPtr){
-	    //parse things
+	    
 	  }
 	}
       }
@@ -171,8 +186,38 @@ std::list<NNDObject*> parse(std::list<std::string> tokens, //fix this, maybe do 
   return parsed;
 }
 
+std::string firstWord(std::string input){
+  
+}
+
+//parsing word that creates parsing words
+/*
+void defineSyntax(std::string input,
+		  std::unordered_map<std::string,Word*> &env,
+		  std::list<NNDObject*> &ps){
+  
+}
+*/
 DsWord* fnToDsWord(std::string name, std::function<void(std::list<NNDObject*> &)> fn){
   return new DsWord(name, fn);
+}
+
+//parsing word that creates words
+void defineWord(std::string input,
+		std::unordered_map<std::string,Word*> &env,
+		std::list<NNDObject*> &ps){
+  input = input.substr(input.find_first_not_of(" \t"),input.find_last_not_of(" \t"));
+  std::string name = input.substr(0,input.find_first_of(" \t") - 1); //check
+  std::string rest = input.substr(input.find_first_of(" \t"));
+  std::list<NNDObject*> parsed = parse(rest,env);
+  env[name] = fnToDsWord(name, [=](std::list<NNDObject*> &st){
+      for(auto const& i : parsed){
+	DsWord* wordPtr = dynamic_cast<DsWord*>(i);
+	if(wordPtr){
+	  wordPtr->eval(st);
+	}
+      }
+    });
 }
 
 Program initProgram(){
@@ -182,6 +227,10 @@ Program initProgram(){
   hmap["dup"] = fnToDsWord("dup",&dup);
   hmap["*"] = fnToDsWord("*", &mul);
   hmap["clear"] = fnToDsWord("clear", &clear);
+
+  //testing defining words
+  PsWord* defWord = new PsWord(":",";",&defineWord);
+  hmap[":"] = defWord;
 
   std::list<NNDObject*> dataStack;
   p.dataStack = dataStack;
@@ -205,7 +254,7 @@ void run(Program &p){
 }
 
 void updateProgramStack(Program &p, std::string str){
-  p.programStack = parse(tokenize(str), p.env);
+  p.programStack = parse(str, p.env);
 }
 
 int main(){
