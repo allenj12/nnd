@@ -230,16 +230,29 @@ void defineWord(std::string input,
   input = input.substr(input.find_first_not_of(" \t"),input.find_last_not_of(" \t"));
   std::string name = input.substr(0,input.find_first_of(" \t")); //check
   std::string rest = input.substr(input.find_first_of(" \t"));
+
+  //we temp update the env to hold the name->fn that does nothing
+  //we do this so we can reuse the standard parse function
+  //again this is a total hack and probably should be changed.
+  //fix this.
+  env[name] = fnToDsWord(name,[](std::list<NNDObject*> &st){});
   std::list<NNDObject*> parsed = parse(rest,env);
-  env[name] = fnToDsWord(name,
-			 [=](std::list<NNDObject*> &st){
-			   for(auto const& i : parsed){
-			     DsWord* wordPtr = dynamic_cast<DsWord*>(i);
-			     if(wordPtr){
-			       wordPtr->eval(st);
-			     }
-			   }
-			 });
+  
+  std::function<void(std::list<NNDObject*> &)> fn;
+  fn = [=,&fn](std::list<NNDObject*> &st){
+    for(auto const& i : parsed){
+      DsWord* wordPtr = dynamic_cast<DsWord*>(i);
+      if(wordPtr){
+	if(wordPtr->name != name){	  
+	  wordPtr->eval(st);
+	}
+	else{
+	  fn(st);
+	}
+      }
+    }
+  };
+  env[name] = fnToDsWord(name, fn);
 }
 
 Program initProgram(){
