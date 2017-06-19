@@ -196,7 +196,7 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
 				  delimStack.pop_front();
 			  }
 	      }
-	      else{
+		  if (!foundEnd){
 		//an even bigger hack
 		//fix this
 	      input += " " + temp;
