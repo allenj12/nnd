@@ -28,6 +28,14 @@ public:
   std::string toString(){return std::to_string(num);};
 };
 
+class String : public NNDObject{
+public:
+  std::string str;
+  String(std::string s){str = s;}
+  ~String(){}
+  std::string toString(){return '"'+str+'"';};
+};
+
 /*
 class NNDList : public NNDObject{
 public:
@@ -211,26 +219,67 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
   return parsed;
 }
 
+DsWord* fnToDsWord(std::string name, std::function<void(std::list<NNDObject*> &)> fn){
+  return new DsWord(name, fn);
+}
+
+std::string trim(std::string input){
+  return input.substr(input.find_first_not_of(" \t"),input.find_last_not_of(" \t"));
+}
+
+std::string getFirstWord(std::string input){
+  return input.substr(0,input.find_first_of(" \t"));
+}
+
+std::string getRest(std::string input){
+  return input.substr(input.find_first_of(" \t"));
+}
+
+std::string sliceFirstWord(std::string input){
+  std::string temp = input.substr(input.find_first_of(" \t")); 
+  return trim(temp);
+}
+
 //parsing word that creates parsing words
-/*
 void defineSyntax(std::string input,
 		  std::unordered_map<std::string,Word*> &env,
 		  std::list<NNDObject*> &ps){
+
+  input = trim(input);
+  std::string name = getFirstWord(input);
+  input = sliceFirstWord(input);
+
+  std::string end = getFirstWord(input);
+  std::string rest = sliceFirstWord(input);
+
+  std::list<NNDObject*> parsed = parse(rest,env);
+
+  std::function<void(std::string,
+		     std::unordered_map<std::string,Word*>&,
+		     std::list<NNDObject*> &)> fn;
+  fn = [=](std::string input,
+	   std::unordered_map<std::string,Word*>& env,
+	   std::list<NNDObject*> &ps){
+    std::list<NNDObject*> tempStack;
+    tempStack.push_front(new String(input));
+    for(auto const& i : parsed){
+      DsWord* wordPtr = dynamic_cast<DsWord*>(i);
+      if(wordPtr){
+	wordPtr->eval(tempStack);
+      }
+    }
+  };
   
-}
-*/
-DsWord* fnToDsWord(std::string name, std::function<void(std::list<NNDObject*> &)> fn){
-  return new DsWord(name, fn);
 }
 
 //parsing word that creates words
 void defineWord(std::string input,
 		std::unordered_map<std::string,Word*> &env,
 		std::list<NNDObject*> &ps){
-  input = input.substr(input.find_first_not_of(" \t"),input.find_last_not_of(" \t"));
-  std::string name = input.substr(0,input.find_first_of(" \t")); //check
-  std::string rest = input.substr(input.find_first_of(" \t"));
-
+  
+  input = trim(input);
+  std::string name = getFirstWord(input);
+  std::string rest = sliceFirstWord(input);
   //we temp update the env to hold the name->fn that does nothing
   //we do this so we can reuse the standard parse function
   //again this is a total hack and probably should be changed.
