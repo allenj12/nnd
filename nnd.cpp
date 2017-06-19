@@ -180,12 +180,21 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
 	    //hack for now
 	    //fix this
 	    bool foundEnd = false;
+		std::list<std::string> delimStack;
 	    std::string input;
 	    std::string temp;
 	    while(!foundEnd){
 	      iss>>temp;
+		  if (psPtr->name == temp) {
+			  delimStack.push_front(psPtr->name);
+		  }
 	      if(temp == psPtr->end){
-		foundEnd = true;
+			  if(delimStack.empty()){
+				  foundEnd = true;
+			  }
+			  else{
+				  delimStack.pop_front();
+			  }
 	      }
 	      else{
 		//an even bigger hack
