@@ -75,6 +75,7 @@ public:
   }
 };
 
+////
 //basic int with deep copy constructor
 class Int : public DsWord{
 public:
@@ -128,7 +129,13 @@ public:
 struct Program{
   std::list<NNDObject*> dataStack;
   std::list<NNDObject*> programStack;
-  std::unordered_map<std::string, Word*> env;
+  std::unordered_map<std::string, Word*> &env;
+
+  Program(std::list<NNDObject*> ds,
+	  std::list<NNDObject*> ps,
+	  std::unordered_map<std::string, Word*> &e) : 
+    dataStack( ds ), programStack( ps ), env( e )
+  {}
 };
 
 //fix this to do deep copies?
@@ -196,18 +203,10 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
     }
     //predifined function check
     else{
-      /*
-      std::cout<<"H"+i<<std::endl;
-      for(auto const& i : env){
-	std::cout<<i.first<<std::endl;
-	}*/
       std::unordered_map<std::string,Word*>::iterator lookup = env.find(i);
-      std::cout<<"J"+i<<std::endl;
       if(lookup != env.end()){
-
 	Function* dsPtr = dynamic_cast<Function*>(&*lookup->second);
 	if(dsPtr){
-	  std::cout<<dsPtr->toString()<<std::endl;
 	  parsed.push_back(dsPtr);
 	}
 	else{
@@ -216,7 +215,7 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
 	    //hack for now
 	    //fix this
 	    bool foundEnd = false;
-		std::list<std::string> delimStack;
+	    std::list<std::string> delimStack;
 	    std::string input;
 	    std::string temp;
 	    while(!foundEnd){
@@ -294,7 +293,7 @@ void defineSyntax(std::string input,
   
   fn = [=](std::string input,
 	   std::unordered_map<std::string,Word*> &env,
-	   std::list<NNDObject*> &ps) mutable{
+	   std::list<NNDObject*> &ps){
     std::list<NNDObject*> tempStack;
     tempStack.push_front(new String(input));
     for(auto const& i : parsed){
@@ -308,7 +307,7 @@ void defineSyntax(std::string input,
       tempStack.pop_front();
     }
   };
-  env[name] = new PsWord(name,end,fn);
+  env.insert({name,new PsWord(name,end,fn)});
 }
 
 //parsing word that creates words
@@ -323,7 +322,7 @@ void defineWord(std::string input,
   //we do this so we can reuse the standard parse function
   //again this is a total hack and probably should be changed.
   //fix this.
-  env[name] = new Function(name,[](std::list<NNDObject*> &st){});
+  env.insert({name,new Function(name,[](std::list<NNDObject*> &st){})});
   std::list<NNDObject*> parsed = parse(rest,env);
   
   std::function<void(std::list<NNDObject*> &)> fn;
@@ -331,7 +330,7 @@ void defineWord(std::string input,
     for(auto const& i : parsed){
       Function* wordPtr = dynamic_cast<Function*>(i);
       if(wordPtr){
-	if(wordPtr->name != name){	  
+	if(wordPtr->name != name){
 	  wordPtr->eval(st);
 	}
 	else{
@@ -340,60 +339,56 @@ void defineWord(std::string input,
       }
     }
   };
+  //we know the key exists here
   env[name] = new Function(name,fn);
 }
 
-Program initProgram(){
-  Program p;
+Program* initProgram(){
   //start with just the dup function
-  std::unordered_map<std::string, Word*> hmap;
-  hmap["dup"] = new Function("dup",&dup);
-  hmap["*"] = new Function("*",&mul);
-  hmap["clear"] = new Function("clear",&clear);
+  std::unordered_map<std::string, Word*>* env = new std::unordered_map<std::string, Word*>();
+  std::list<NNDObject*> dataStack;
+  std::list<NNDObject*> programStack;
+  Program* p = new Program(dataStack,programStack,*env);
 
-  hmap["parse"] = new Function("parse",
-			     [&](std::list<NNDObject*> &st){
+  p->env.insert({"dup",new Function("dup",&dup)});
+  p->env.insert({"*",new Function("*",&mul)});
+  p->env.insert({"clear",new Function("clear",&clear)});
+
+  p->env.insert({"parse",new Function("parse",
+				      [=](std::list<NNDObject*> &st){
 			       std::list<NNDObject*> temp;
 			       if(!st.empty()){
 				 String* strPtr = dynamic_cast<String*>(st.front());
 				 if(strPtr){
-				   temp = parse(strPtr->str,hmap);
+				   temp = parse(strPtr->str,*env);
 				 }
 			       }
 			       st.pop_front();
 			       st.push_front(new NNDList(temp));
-			     });
+				    })});
   
-  hmap[":"] = new PsWord(":",";",&defineWord);
-  hmap[":s"] = new PsWord(":s",";",&defineSyntax);
+  p->env.insert({":",new PsWord(":",";",&defineWord)});
+  p->env.insert({":s",new PsWord(":s",";",&defineSyntax)});
 
   //testing if we use this function it should
   //only be for parsing words
-  hmap["elist"] = new Function("elist", &everythingIsAList);
-
-  std::list<NNDObject*> dataStack;
-  p.dataStack = dataStack;
-
-  std::list<NNDObject*> programStack;
-  p.programStack = programStack;
-
-  p.env = hmap;
+  p->env.insert({"elist",new Function("elist", &everythingIsAList)});
   
   return p;
 }
 
-void run(Program &p){
-  while(!p.programStack.empty()){
-    DsWord* wordPtr = dynamic_cast<DsWord*>(p.programStack.front());
+void run(Program* p){
+  while(!p->programStack.empty()){
+    DsWord* wordPtr = dynamic_cast<DsWord*>(p->programStack.front());
     if(wordPtr){
-      wordPtr->eval(p.dataStack);
+      wordPtr->eval(p->dataStack);
     }
-    p.programStack.pop_front();
+    p->programStack.pop_front();
   }
 }
 
-void updateProgramStack(Program &p, std::string str){
-  p.programStack = parse(str, p.env);
+void updateProgramStack(Program* p, std::string str){
+  p->programStack = parse(str, p->env);
 }
 
 int main(){
@@ -403,7 +398,7 @@ int main(){
   std::cout<<"NND repl: 'quit' to quit"<<std::endl;
 
   std::string commands;
-  Program p = initProgram();
+  Program* p = initProgram();
   while(commands != "quit"){
     std::cout<<">> ";
     //a plain cin is cool here to get a
@@ -413,7 +408,7 @@ int main(){
     updateProgramStack(p, commands);
     run(p);
 
-    for(auto const& i : p.dataStack){
+    for(auto const& i : p->dataStack){
       std::cout<<i->toString()<<std::endl;
     }
     
