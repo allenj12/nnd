@@ -69,7 +69,7 @@ public:
     name( fn.name ), word( fn.word )
   {}
   ~Function(){}
-  std::string toString(){return "Fn<"+name+">";}
+  std::string toString(){return name;}
   void eval(std::list<NNDObject*> &st){
     word(st);
   }
@@ -86,6 +86,27 @@ public:
   {}
   ~Int(){}
   std::string toString() {return std::to_string(num);};
+  void eval(std::list<NNDObject*> &st){
+    st.push_front(this);
+  }
+};
+
+class Bool : public DsWord{
+public:
+  bool boolean;
+  Bool(bool b){boolean = b;}
+  Bool(const Bool& i) :
+    boolean( i.boolean )
+  {}
+  ~Bool(){}
+  std::string toString(){
+      if(boolean){
+	return "t";
+	  }
+      else{
+	return "f";
+      }
+  }
   void eval(std::list<NNDObject*> &st){
     st.push_front(this);
   }
@@ -162,6 +183,122 @@ void mul(std::list<NNDObject*> &st){
     Int* yPtr = dynamic_cast<Int*>(yDPtr);
     if(xPtr && yPtr){
       st.push_front(new Int(xPtr->num * yPtr->num));
+    }
+  }
+}
+
+void subtract(std::list<NNDObject*> &st){
+  if(st.size() >= 2){
+    NNDObject* xDPtr = st.front();
+    st.pop_front();
+    NNDObject* yDPtr = st.front();
+    st.pop_front();
+
+    Int* xPtr = dynamic_cast<Int*>(xDPtr);
+    Int* yPtr = dynamic_cast<Int*>(yDPtr);
+    if(xPtr && yPtr){
+      st.push_front(new Int(yPtr->num - xPtr->num));
+    }
+  }
+}
+
+void add(std::list<NNDObject*> &st){
+  if(st.size() >= 2){
+    NNDObject* xDPtr = st.front();
+    st.pop_front();
+    NNDObject* yDPtr = st.front();
+    st.pop_front();
+
+    Int* xPtr = dynamic_cast<Int*>(xDPtr);
+    Int* yPtr = dynamic_cast<Int*>(yDPtr);
+    if(xPtr && yPtr){
+      st.push_front(new Int(xPtr->num + yPtr->num));
+    }
+  }
+}
+
+void eval(std::list<NNDObject*> &st){
+  NNDObject* objectPtr = st.front();
+  st.pop_front();
+  NNDList* listPtr = dynamic_cast<NNDList*>(objectPtr);
+  if(listPtr){
+    for(auto const& i : listPtr->nndList){
+      DsWord* dsPtr = dynamic_cast<DsWord*>(i);
+      if(dsPtr){
+	dsPtr->eval(st);
+      }
+    }
+  }
+}
+
+void lte(std::list<NNDObject*> &st){
+  if(st.size() >= 2){
+    NNDObject* secondPtr = st.front();
+    st.pop_front();
+    NNDObject* firstPtr = st.front();
+    st.pop_front();
+
+    Int* sPtr = dynamic_cast<Int*>(secondPtr);
+    Int* fPtr = dynamic_cast<Int*>(firstPtr);
+
+    if(sPtr && fPtr){
+      if(fPtr->num <= sPtr->num){
+	st.push_front(new Bool(true));
+      }
+      else
+	st.push_front(new Bool(false));
+    }
+  }
+}
+
+void lt(std::list<NNDObject*> &st){
+  if(st.size() >= 2){
+    NNDObject* secondPtr = st.front();
+    st.pop_front();
+    NNDObject* firstPtr = st.front();
+    st.pop_front();
+
+    Int* sPtr = dynamic_cast<Int*>(secondPtr);
+    Int* fPtr = dynamic_cast<Int*>(firstPtr);
+
+    if(sPtr && fPtr){
+      if(fPtr->num < sPtr->num){
+	st.push_front(new Bool(true));
+      }
+      else
+	st.push_front(new Bool(false));
+    }
+  }
+}
+
+void drop(std::list<NNDObject*> &st){
+  if(!st.empty()){
+    st.pop_front();
+  }
+}
+
+void nndIf(std::list<NNDObject*> &st){
+  if(st.size() >= 3){
+    NNDObject* yesPtr = st.front();
+    st.pop_front();
+    NNDObject* noPtr = st.front();
+    st.pop_front();
+    NNDObject* boolPtr = st.front();
+    st.pop_front();
+
+    Bool* bPtr = dynamic_cast<Bool*>(boolPtr);
+    NNDList* nPtr = dynamic_cast<NNDList*>(noPtr);
+    NNDList* yPtr = dynamic_cast<NNDList*>(yesPtr);
+
+    if(bPtr && nPtr && yPtr){
+      if(bPtr->boolean){
+	st.push_front(yPtr);
+	eval(st);
+      }
+      else{
+	st.push_front(nPtr);
+	eval(st);
+      }
     }
   }
 }
@@ -328,9 +465,9 @@ void defineWord(std::string input,
   std::function<void(std::list<NNDObject*> &)> fn;
   fn = [=,&fn](std::list<NNDObject*> &st){
     for(auto const& i : parsed){
-      Function* wordPtr = dynamic_cast<Function*>(i);
+      DsWord* wordPtr = dynamic_cast<DsWord*>(i);
       if(wordPtr){
-	if(wordPtr->name != name){
+	if(wordPtr->toString() != name){
 	  wordPtr->eval(st);
 	}
 	else{
@@ -353,7 +490,14 @@ Program* initProgram(){
   p->env.insert({"dup",new Function("dup",&dup)});
   p->env.insert({"*",new Function("*",&mul)});
   p->env.insert({"clear",new Function("clear",&clear)});
-
+  p->env.insert({"eval", new Function("eval", &eval)});
+  p->env.insert({"if", new Function("if", &nndIf)});
+  p->env.insert({"<", new Function("<", &lt)});
+  p->env.insert({"<=", new Function("<=", &lte)});
+  p->env.insert({"drop", new Function("drop", &drop)});
+  p->env.insert({"-", new Function("-", &subtract)});
+  p->env.insert({"+", new Function("+", &add)});
+  
   p->env.insert({"parse",new Function("parse",
 				      [=](std::list<NNDObject*> &st){
 			       std::list<NNDObject*> temp;
