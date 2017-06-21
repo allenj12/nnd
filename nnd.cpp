@@ -357,21 +357,21 @@ std::list<NNDObject*> parse(std::string input, //fix this, maybe do this one at 
 	    std::string temp;
 	    while(!foundEnd){
 	      iss>>temp;
-		  if (psPtr->name == temp) {
-			  delimStack.push_front(psPtr->name);
-		  }
-	      if(temp == psPtr->end){
-			  if(delimStack.empty()){
-				  foundEnd = true;
-			  }
-			  else{
-				  delimStack.pop_front();
-			  }
+	      if (psPtr->name == temp) {
+		delimStack.push_front(psPtr->name);
 	      }
-		  if (!foundEnd){
+	      if(temp == psPtr->end){
+		if(delimStack.empty()){
+		  foundEnd = true;
+		}
+		else{
+		  delimStack.pop_front();
+		}
+	      }
+	      if (!foundEnd){
 		//an even bigger hack
 		//fix this
-	      input += " " + temp;
+		input += " " + temp;
 	      }
 	    }
 	    psPtr->parse(input, env, parsed);
@@ -461,7 +461,7 @@ void defineWord(std::string input,
   //fix this.
   env.insert({name,new Function(name,[](std::list<NNDObject*> &st){})});
   std::list<NNDObject*> parsed = parse(rest,env);
-  
+
   std::function<void(std::list<NNDObject*> &)> fn;
   fn = [=,&fn](std::list<NNDObject*> &st){
     for(auto const& i : parsed){
@@ -497,20 +497,33 @@ Program* initProgram(){
   p->env.insert({"drop", new Function("drop", &drop)});
   p->env.insert({"-", new Function("-", &subtract)});
   p->env.insert({"+", new Function("+", &add)});
-  
-  p->env.insert({"parse",new Function("parse",
-				      [=](std::list<NNDObject*> &st){
-			       std::list<NNDObject*> temp;
-			       if(!st.empty()){
-				 String* strPtr = dynamic_cast<String*>(st.front());
-				 if(strPtr){
-				   temp = parse(strPtr->str,*env);
-				 }
-			       }
-			       st.pop_front();
-			       st.push_front(new NNDList(temp));
-				    })});
-  
+
+  std::function<void(std::list<NNDObject*> &)> pfn =
+    [=](std::list<NNDObject*> &st){
+    std::list<NNDObject*> temp;
+    if(!st.empty()){
+      String* strPtr = dynamic_cast<String*>(st.front());
+      if(strPtr){
+	temp = parse(strPtr->str,*env);
+      }
+    }
+    st.pop_front();
+    st.push_front(new NNDList(temp));
+  };
+  p->env.insert({"parse",new Function("parse", pfn)});
+
+  std::function<void(std::string,
+		     std::unordered_map<std::string,Word*>&,
+		     std::list<NNDObject*> &)> listFn;
+
+  listFn = [](std::string input,
+	  std::unordered_map<std::string,Word*> &env,
+	  std::list<NNDObject*> &ps){
+    std::list<NNDObject*> parsed = parse(input,env);
+    ps.push_back(new NNDList(parsed));
+  };
+
+  p->env.insert({"[",new PsWord("[","]",listFn)});
   p->env.insert({":",new PsWord(":",";",&defineWord)});
   p->env.insert({":s",new PsWord(":s",";",&defineSyntax)});
 
