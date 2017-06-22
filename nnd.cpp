@@ -459,25 +459,23 @@ void defineWord(std::string input,
   //we do this so we can reuse the standard parse function
   //again this is a total hack and probably should be changed.
   //fix this.
-  env.insert({name,new Function(name,[](std::list<NNDObject*> &st){})});
+  std::function<void(std::list<NNDObject*> &)> fn;
+  Function* updatedWord = new Function(name,fn);
+
+  env.insert({name,updatedWord});
+
   std::list<NNDObject*> parsed = parse(rest,env);
 
-  std::function<void(std::list<NNDObject*> &)> fn;
-  fn = [=,&fn](std::list<NNDObject*> &st){
+  updatedWord->word = [=](std::list<NNDObject*> &st){
     for(auto const& i : parsed){
       DsWord* wordPtr = dynamic_cast<DsWord*>(i);
       if(wordPtr){
 	if(wordPtr->toString() != name){
 	  wordPtr->eval(st);
 	}
-	else{
-	  fn(st);
-	}
       }
     }
   };
-  //we know the key exists here
-  env[name] = new Function(name,fn);
 }
 
 Program* initProgram(){
